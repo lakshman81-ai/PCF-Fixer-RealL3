@@ -54,7 +54,7 @@ export const SceneHealthHUD = () => {
   if (dataTable.length === 0) return null;
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex bg-slate-900/90 backdrop-blur-md rounded-full shadow-lg border border-slate-700/50 p-1 text-xs select-none">
+    <div className="absolute top-4 left-4 z-20 flex bg-slate-900/90 backdrop-blur-md rounded-full shadow-lg border border-slate-700/50 p-1 text-xs select-none">
 
       <div className="flex items-center gap-1.5 px-3 py-1 border-r border-slate-700/50">
         <span className="text-slate-400 font-medium">Pipes</span>
