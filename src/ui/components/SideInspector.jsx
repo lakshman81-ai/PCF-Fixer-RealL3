@@ -3,18 +3,21 @@ import { useStore } from '../../store/useStore';
 import { useAppContext } from '../../store/AppContext';
 
 export const SideInspector = () => {
-  const { state: appState, dispatch } = useAppContext();
-  const selectedElementId = useStore(state => state.selectedElementId);
+  const { dispatch } = useAppContext();
+  const multiSelectedIds = useStore(state => state.multiSelectedIds);
   const dataTable = useStore(state => state.dataTable);
-  const setSelected = useStore(state => state.setSelected);
+  const clearMultiSelect = useStore(state => state.clearMultiSelect);
   const pushHistory = useStore(state => state.pushHistory);
 
   const [formData, setFormData] = useState(null);
   const [isChanged, setIsChanged] = useState(false);
 
+  const selectedElements = multiSelectedIds.map(id => dataTable.find(r => r._rowIndex === id)).filter(Boolean);
+  const isVisible = multiSelectedIds.length > 0 && selectedElements.some(el => (el.type || '').toUpperCase() !== 'SUPPORT');
+
   useEffect(() => {
-    if (selectedElementId) {
-      const el = dataTable.find(r => r._rowIndex === selectedElementId);
+    if (isVisible && selectedElements.length > 0) {
+      const el = selectedElements[0];
       if (el) {
         setFormData({
           ep1: el.ep1 ? { ...el.ep1 } : null,
@@ -47,7 +50,7 @@ export const SideInspector = () => {
     } else {
       setFormData(null);
     }
-  }, [selectedElementId, dataTable]);
+  }, [isVisible, multiSelectedIds, dataTable]);
 
   const handleChange = (field, subfield, value) => {
     setFormData(prev => {
@@ -67,21 +70,40 @@ export const SideInspector = () => {
 
     pushHistory('Inspector Edit');
 
-    // Update both stores
+    // Construct the attrs payload containing only the updatable fields
+    const updatedAttrs = {
+      bore: formData.bore,
+      pipelineRef: formData.pipelineRef,
+      skey: formData.skey,
+      PIPING_CLASS: formData.PIPING_CLASS,
+      RATING: formData.RATING,
+      LINENO_KEY: formData.LINENO_KEY,
+      CA97: formData.CA97,
+      CA98: formData.CA98,
+      CA1: formData.CA1,
+      CA2: formData.CA2,
+      CA3: formData.CA3,
+      CA4: formData.CA4,
+      CA5: formData.CA5,
+      CA6: formData.CA6,
+      CA7: formData.CA7,
+      CA8: formData.CA8,
+      CA9: formData.CA9,
+      CA10: formData.CA10,
+    };
+
+    // Use BATCH_UPDATE_SUPPORT_ATTRS pattern which allows mapping any properties inside attrs
     dispatch({
-      type: 'UPDATE_STAGE2_ROW_COORDS',
-      payload: {
-        rowIndex: formData._rowIndex,
-        coords: formData
-      }
+      type: 'BATCH_UPDATE_SUPPORT_ATTRS',
+      payload: { rowIndices: multiSelectedIds, attrs: updatedAttrs }
     });
 
     const updatedTable = dataTable.map(r =>
-      r._rowIndex === formData._rowIndex ? { ...r, ...formData } : r
+      multiSelectedIds.includes(r._rowIndex) ? { ...r, ...updatedAttrs } : r
     );
     useStore.getState().setDataTable(updatedTable);
 
-    dispatch({ type: "ADD_LOG", payload: { stage: "INSPECTOR", type: "Applied/Fix", message: `Updated properties for row ${formData._rowIndex}.` } });
+    dispatch({ type: "ADD_LOG", payload: { stage: "INSPECTOR", type: "Applied/Fix", message: `Updated properties for ${multiSelectedIds.length} elements.` } });
 
     setIsChanged(false);
   };
@@ -128,17 +150,23 @@ export const SideInspector = () => {
     window.dispatchEvent(new CustomEvent('canvas-focus-point', { detail: { x: midX, y: midY, z: midZ, dist: distance } }));
   };
 
-  if (!selectedElementId || !formData) return null;
+  if (!isVisible || !formData) return null;
 
   return (
-    <div className={`absolute top-4 left-4 z-20 w-72 bg-slate-900 border border-slate-700 shadow-2xl rounded-lg overflow-hidden transition-transform transform translate-x-0 flex flex-col max-h-[calc(100vh-6rem)]`}>
+    <div className={`absolute top-16 left-4 z-20 w-72 bg-slate-900 border border-slate-700 shadow-2xl rounded-lg overflow-hidden transition-transform transform translate-x-0 flex flex-col max-h-[calc(100vh-6rem)]`}>
       {/* Header */}
       <div className="flex justify-between items-center bg-slate-800 p-3 border-b border-slate-700">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-100 bg-blue-600 px-2 py-0.5 rounded uppercase">{formData.type}</span>
-          <span className="text-slate-400 text-xs">Row {formData._rowIndex}</span>
+          {multiSelectedIds.length === 1 ? (
+            <>
+              <span className="text-xs font-bold text-slate-100 bg-blue-600 px-2 py-0.5 rounded uppercase">{formData.type}</span>
+              <span className="text-slate-400 text-xs">Row {formData._rowIndex}</span>
+            </>
+          ) : (
+            <span className="text-xs font-bold text-slate-100 bg-blue-600 px-2 py-0.5 rounded uppercase">{multiSelectedIds.length} Elements Selected</span>
+          )}
         </div>
-        <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-white" title="Deselect">
+        <button onClick={() => clearMultiSelect()} className="text-slate-400 hover:text-white" title="Deselect">
           ✕
         </button>
       </div>
@@ -156,7 +184,8 @@ export const SideInspector = () => {
             </button>
         </div>
 
-        {/* Endpoints */}
+        {/* Endpoints - Only show when 1 element is selected */}
+        {multiSelectedIds.length === 1 && (
         <div className="space-y-2">
           <h3 className="text-slate-300 text-sm font-semibold border-b border-slate-700 pb-1 flex justify-between">
             Endpoints
@@ -180,6 +209,7 @@ export const SideInspector = () => {
             </div>
           ))}
         </div>
+        )}
 
         {/* Attributes */}
         <div className="space-y-2">
